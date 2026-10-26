@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+<rect x="64" y="108" width="190" height="228" rx="20" fill="#20242A"/>
+<rect x="136" y="68" width="194" height="264" rx="20" fill="#FFFFFF" stroke="#20242A" stroke-width="10"/>
+
+<path d="M168 118h112M168 140h78" fill="none" stroke="#20242A" stroke-width="9" stroke-linecap="round"/>
+
+<rect x="164" y="171" width="138" height="49" rx="13" fill="#F28B32"/>
+<text x="233" y="204" text-anchor="middle" font-family="Arial, sans-serif" font-size="27" font-weight="700" letter-spacing="2" fill="#FFFFFF">MOD</text>
+
+<path d="M172 259h63" fill="none" stroke="#F28B32" stroke-width="10" stroke-linecap="round"/>
+<path d="M230 246l18 13-18 13z" fill="#F28B32"/>
+<path d="M294 291h-63" fill="none" stroke="#20242A" stroke-width="10" stroke-linecap="round"/>
+<path d="M236 278l-18 13 18 13z" fill="#20242A"/>
+</svg>
