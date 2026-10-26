@@ -810,6 +810,7 @@ class App(tk.Tk):
         target = None
 
         owner_dir = None
+        fxonly_replace = False
         if effect == EFFECT_COMMON2STAND:
             raw = self.var_eid.get().strip()
             if not raw.isdigit() or not (1 <= int(raw) <= 999):
@@ -817,11 +818,16 @@ class App(tk.Tk):
                 return
             eid = int(raw)
             if not self.info.dir_name:
-                # 纯特效包没有模型目录，得问一下这套特效是给哪把武器的
-                item = self._owner_item or self._pick_owner()
+                # 纯特效包没有模型目录，得确定这套特效是给哪把武器的
+                if model == MODEL_REPLACE:
+                    # 已经选了「替换成 X」——直接拿 X 当所属武器，不用再问一遍
+                    item = self._current_target()
+                else:
+                    item = self._owner_item or self._pick_owner()
+                    if item is not None:
+                        self._owner_item = item
                 if item is None:
                     return
-                self._owner_item = item
                 owner_dir = item["dirname"]
                 # epvid 必须和所选武器编号一致，否则 evwp 里的 mEpvNo 对不上
                 num = re.sub(r"\D", "", owner_dir)
@@ -833,6 +839,12 @@ class App(tk.Tk):
             if target is None:
                 messagebox.showinfo("提示", "选了「替换成」就先选目标武器")
                 return
+            if not self.info.dir_name:
+                # 纯特效包本来就没有模型，替换无从谈起。
+                # 刚才已经把这个目标当成「所属武器」用了，这里不再做模型替换。
+                model = MODEL_KEEP
+                target = None
+                fxonly_replace = True
         if effect == EFFECT_NONE and model == MODEL_KEEP:
             messagebox.showinfo("提示", "特效和模型都没选，没东西可做")
             return
@@ -858,11 +870,12 @@ class App(tk.Tk):
         self.btn_preview.configure(state="disabled")
         self._set_status("处理中…")
         threading.Thread(target=self._worker,
-                         args=(effect, eid, model, target, save, out, owner_dir, aggressive),
+                         args=(effect, eid, model, target, save, out, owner_dir,
+                             aggressive, fxonly_replace, owner_dir),
                          daemon=True).start()
 
     def _worker(self, effect, eid, model, target, save, out, owner_dir=None,
-                aggressive=False):
+                aggressive=False, fxonly_replace=False, bind_dir=None):
         """先做特效转换，再处理模型（替换 / 只留特效）。
 
         ★ 顺序不能反：特效转换要改 evwp 的 mEpvNo，用的是扫描时的旧路径；
@@ -871,6 +884,7 @@ class App(tk.Tk):
         try:
             pkg = package.Package(self.var_path.get())
             info = detect.scan(pkg)
+            was_fxonly = not info.dir_name
             log, err = [], None
 
             if effect == EFFECT_COMMON2STAND:
@@ -883,7 +897,14 @@ class App(tk.Tk):
                 part, err = convert.strip_weapon_effect(pkg, info, aggressive)
                 log += [("— 特效：删除武器特效 —", "")] + part
 
-            if not err and model != MODEL_KEEP:
+            # ---- 模型处理 ----
+            if not err and fxonly_replace:
+                # 纯特效包选了「替换成」：包里没有模型可换，
+                # 这个目标刚才只当「所属武器」用了
+                log += [("— 模型 —", ""),
+                        ("跳过", "纯特效包没有模型可替换，%s 只用来绑定特效"
+                         % (bind_dir or "目标武器"))]
+            elif not err and model != MODEL_KEEP:
                 if effect != EFFECT_NONE:
                     # 特效转换后形态变了（比如刚转成独立特效），
                     # 重新扫描一遍，才知道要不要同步 epvid / 哪些是特效文件
