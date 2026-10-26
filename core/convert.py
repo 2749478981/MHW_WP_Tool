@@ -93,19 +93,25 @@ def _sync_sound(pkg, info, target_stem, fill_missing, log):
 #       于是所有用通用特效（mEpvNo=0）的武器都会读到被改的 efx，冲突。
 #
 # 解法：把默认路径的整个目录按 epvid 搬到另一个目录，再把 epv3 里的
-#       路径字符串一起改掉。epv3 是二进制，路径字符串长度必须保持一致，
-#       所以隔离名也做成 4 字符：
-#         wp03 + id=28  → wp28
-#         wp03 + id=111 → w111
+#       路径字符串一起改掉。
+#
+# ★ 目录名必须和原来的 `wp03` 一样是 4 字符：
+#   epv3 的字符串是**定长槽位**（每个条目固定大小，后面跟 padding），
+#   改成 `wp03/wp28/` 这种子目录会溢出到下一条目，把整个文件写坏。
+#
+# ★ 用 `_NNN` 而不是 `wpNN`：
+#   - id=3  → 若用 wp03 就等于原目录，等于没隔离
+#   - id=2  → 若用 wp02 会撞上双刀的武器组目录
+#   下划线开头不可能是任何武器组（武器组都是 wpNN），彻底避开。
 # ----------------------------------------------------------------------
 def _isolate_key(epv_base, eid):
-    """`hm_wp03` + 28 → `wp28`；+ 111 → `w111`（都是 4 字符，可等长替换）。"""
+    """`hm_wp03` + 28 → `_028`（固定 4 字符，可等长替换且不会撞车）。"""
     m = re.match(r"^hm_(wp\d+)$", epv_base or "")
     if not m:
         return None
     if not 1 <= eid <= 999:
         return None
-    return "wp%02d" % eid if eid <= 99 else "w%03d" % eid
+    return "_%03d" % eid
 
 
 def _move_effect_dir(pkg, src_key, dst_key, log, note):
