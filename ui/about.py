@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""「关于」窗口：版本号、作者、B站链接、更新日志。"""
+"""「关于」窗口：版本号、作者、B站链接、更新日志、检查更新。"""
 import tkinter as tk
 import webbrowser
 from tkinter import ttk
@@ -27,10 +27,10 @@ class AboutWindow(tk.Toplevel):
         self.resizable(False, False)
         self.transient(master)
 
-        w, h = 520, 430
-        x = master.winfo_rootx() + (master.winfo_width() - w) // 2
+        # 只定位，尺寸交给内容自己算（resizable=False 时 geometry 的宽高会被 reqsize 覆盖）
+        x = master.winfo_rootx() + 120
         y = master.winfo_rooty() + 60
-        self.geometry("%dx%d+%d+%d" % (w, h, max(20, x), max(20, y)))
+        self.geometry("+%d+%d" % (max(20, x), max(20, y)))
 
         # ---- 头部 ----
         head = tk.Frame(self, bg=CARD, highlightthickness=1,
@@ -53,32 +53,9 @@ class AboutWindow(tk.Toplevel):
         link.pack(anchor="w", padx=14, pady=(4, 12))
         link.bind("<Button-1>", lambda _e: webbrowser.open(version.BILI_URL))
 
-        # ---- 更新日志 ----
-        tk.Label(self, text="更新内容", font=("Microsoft YaHei UI", 9, "bold"),
-                 bg=BG, fg=TEXT).pack(anchor="w", padx=16, pady=(12, 4))
-
-        wrap = tk.Frame(self, bg=CARD, highlightthickness=1, highlightbackground=LINE)
-        wrap.pack(fill="both", expand=True, padx=14)
-        # width=1 是必须的：Text 默认 80 字符宽，会把窗口撑出去
-        txt = tk.Text(wrap, font=FONT_MONO, bg=CARD, fg=TEXT, relief="flat",
-                      wrap="char", padx=10, pady=8, width=1, height=12)
-        vs = ttk.Scrollbar(wrap, orient="vertical", command=txt.yview)
-        txt.configure(yscrollcommand=vs.set)
-        vs.pack(side="right", fill="y")
-        txt.pack(side="left", fill="both", expand=True)
-
-        txt.tag_configure("ver", foreground=ACCENT, font=("Consolas", 9, "bold"))
-        txt.tag_configure("dim", foreground=MUTED)
-        for ver, items in version.CHANGELOG:
-            txt.insert("end", "v%s\n" % ver, "ver")
-            for it in items:
-                txt.insert("end", "  · %s\n" % it)
-            txt.insert("end", "\n")
-        txt.configure(state="disabled")
-
-        # ---- 底部 ----
+        # ---- 底部按钮：先 pack 到 bottom，否则会被下面的 Text 挤出窗口 ----
         btns = tk.Frame(self, bg=BG)
-        btns.pack(fill="x", padx=14, pady=12)
+        btns.pack(side="bottom", fill="x", padx=14, pady=12)
         ttk.Button(btns, text="关闭", width=8,
                    command=self.destroy).pack(side="right")
         ttk.Button(btns, text="打开 B 站", width=10,
@@ -86,6 +63,30 @@ class AboutWindow(tk.Toplevel):
         if self._on_check:
             ttk.Button(btns, text="检查更新", width=10,
                        command=self._do_check).pack(side="left")
+
+        # ---- 更新日志 ----
+        tk.Label(self, text="更新内容", font=("Microsoft YaHei UI", 9, "bold"),
+                 bg=BG, fg=TEXT).pack(anchor="w", padx=16, pady=(12, 4))
+
+        wrap = tk.Frame(self, bg=CARD, highlightthickness=1, highlightbackground=LINE)
+        wrap.pack(fill="both", expand=True, padx=14)
+        # width=1 是必须的：Text 默认 80 字符宽会把窗口撑出去；
+        # wrap="char" 也是必须的：中文没有空格，word 模式不会断行
+        txt = tk.Text(wrap, font=FONT_MONO, bg=CARD, fg=TEXT, relief="flat",
+                      wrap="char", padx=10, pady=8, width=58, height=9)
+        vs = ttk.Scrollbar(wrap, orient="vertical", command=txt.yview)
+        txt.configure(yscrollcommand=vs.set)
+        vs.pack(side="right", fill="y")
+        txt.pack(side="left", fill="both", expand=True)
+
+        txt.tag_configure("ver", foreground=ACCENT, font=("Consolas", 9, "bold"))
+        for ver, items in version.CHANGELOG:
+            txt.insert("end", "v%s\n" % ver, "ver")
+            for it in items:
+                txt.insert("end", "  · %s\n" % it)
+            txt.insert("end", "\n")
+        txt.configure(state="disabled")
+        txt.see("1.0")          # 插入后光标在末尾，会把视图带到底部，拉回顶部
 
         self.bind("<Escape>", lambda _e: self.destroy())
         self.after(80, lambda: self.lift())
