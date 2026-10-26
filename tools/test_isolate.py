@@ -24,12 +24,13 @@ for base, eid, want in [("hm_wp03", 28, "_028"), ("hm_wp03", 5, "_005"),
                         ("hm_wp03", 99, "_099"), ("hm_wp03", 111, "_111"),
                         ("hm_wp00", 17, "_017")]:
     got = convert._isolate_key(base, eid)
-    check(got == want and len(got) == 4,
-          "%s + %d → %s（长度 %s）" % (base, eid, got, len(got) if got else 0))
+    check(got == want,
+          "%s + %d → %s" % (base, eid, got))
 
 check(convert._isolate_key("hm_wp03_28", 28) is None, "带 _NN 后缀的不做隔离（已经隔离过）")
 
 # 用户踩过的两个坑：id=3 会等于原目录、id=2 会撞双刀的 wp02
+# 现在是 wp03/_NNN 子目录，天然避开
 for eid in (2, 3):
     k = convert._isolate_key("hm_wp03", eid)
     check(k != "wp03" and k != "wp%02d" % eid,
@@ -47,19 +48,22 @@ FAKE = b"\x00\x00vfx\\efx\\wp\\wp03\\test_a\x00\x00"
 pkg.write("wp/swo/epv/hm_wp03.epv3", FAKE)
 
 log = []
-moved = convert._move_effect_dir(pkg, "wp03", "_028", log, "隔离特效目录")
+SRC_PRE = "vfx/efx/wp/wp03/"
+DST_PRE = "vfx/efx/wp/wp03/_028/"
+moved = convert._move_effect_dir(pkg, SRC_PRE, DST_PRE, log, "隔离特效目录")
 check(moved == 2, "搬了 2 个文件（实际 %d）" % moved)
 n = pkg.names()
-check("vfx/efx/wp/_028/test_a.efx" in n, "test_a.efx 搬到 _028")
-check("vfx/efx/wp/_028/sub/test_b.efx" in n, "子目录也一起搬")
+check("vfx/efx/wp/wp03/_028/test_a.efx" in n, "test_a.efx 搬到 wp03/_028")
+check("vfx/efx/wp/wp03/_028/sub/test_b.efx" in n, "子目录也一起搬")
 check("vfx/efx/wp/wp00/other.efx" in n, "别的武器组 wp00 不动")
-check(not any(x.startswith("vfx/efx/wp/wp03/") for x in n), "wp03 目录已清空")
+check(not any(x.startswith("vfx/efx/wp/wp03/") and "/_028/" not in x for x in n),
+      "wp03 根目录已清空（只剩 _028 子目录）")
 
-fixed = convert._rewrite_effect_refs(pkg, "wp03", "_028", log)
+fixed = convert._rewrite_effect_refs(pkg, SRC_PRE, DST_PRE, log)
 check(fixed >= 1, "改了 %d 个 epv3（包里引用默认路径的都要改）" % fixed)
 got = pkg.read("wp/swo/epv/hm_wp03.epv3")
-check(got == b"\x00\x00vfx\\efx\\wp\\_028\\test_a\x00\x00",
-      "epv3 里的路径换成 _028，且长度不变（%d → %d）" % (len(FAKE), len(got)))
+check(got == b"\x00\x00vfx\\efx\\wp\\wp03\\_028\\test_a\x00\x00",
+      "epv3 里的路径换成 wp03\\_028，长度变长也正常（%d → %d）" % (len(FAKE), len(got)))
 for a, d in log:
     print("   ·", a, d)
 
@@ -67,10 +71,10 @@ for a, d in log:
 print()
 print("反向还原：")
 log2 = []
-moved2 = convert._move_effect_dir(pkg, "_028", "wp03", log2, "还原特效目录")
+moved2 = convert._move_effect_dir(pkg, DST_PRE, SRC_PRE, log2, "还原特效目录")
 check(moved2 == 2, "搬回 2 个文件")
 check("vfx/efx/wp/wp03/test_a.efx" in pkg.names(), "回到 wp03")
-fixed2 = convert._rewrite_effect_refs(pkg, "_028", "wp03", log2)
+fixed2 = convert._rewrite_effect_refs(pkg, DST_PRE, SRC_PRE, log2)
 check(fixed2 >= 1, "引用改回 wp03（%d 个）" % fixed2)
 check(pkg.read("wp/swo/epv/hm_wp03.epv3") == FAKE, "epv3 内容完全还原")
 
@@ -83,7 +87,7 @@ before = set(pkg3.names())
 log3, err = convert.to_standalone(pkg3, info3, 30)
 check(err is None, "樱上幕帘转独立无错误：%s" % err)
 check("vfx/huazha/wp03_000.efx" in pkg3.names(), "自定义路径的 efx 原地不动")
-check(not any(x.startswith("vfx/efx/wp/_030/") for x in pkg3.names()),
+check(not any(x.startswith("vfx/efx/wp/wp03/_030/") for x in pkg3.names()),
       "包里没有默认路径目录，不产生隔离目录")
 for a, d in log3:
     if "隔离" in a or "改特效路径" in a:

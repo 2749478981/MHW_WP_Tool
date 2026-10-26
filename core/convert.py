@@ -95,17 +95,20 @@ def _sync_sound(pkg, info, target_stem, fill_missing, log):
 # 解法：把默认路径的整个目录按 epvid 搬到另一个目录，再把 epv3 里的
 #       路径字符串一起改掉。
 #
-# ★ 目录名必须和原来的 `wp03` 一样是 4 字符：
-#   epv3 的字符串是**定长槽位**（每个条目固定大小，后面跟 padding），
-#   改成 `wp03/wp28/` 这种子目录会溢出到下一条目，把整个文件写坏。
+# epv3 的路径是 `packed_path { string path; }` —— **\0 结尾的变长字符串**
+# （见 MHW-EFX-Template 的 EPV3.bt），文件是顺序存储、没有偏移表，
+# 所以改路径长度是安全的，后面的数据自然顺移。
 #
-# ★ 用 `_NNN` 而不是 `wpNN`：
-#   - id=3  → 若用 wp03 就等于原目录，等于没隔离
-#   - id=2  → 若用 wp02 会撞上双刀的武器组目录
-#   下划线开头不可能是任何武器组（武器组都是 wpNN），彻底避开。
+# 隔离方式：在默认目录下再套一层 `_NNN`：
+#   vfx/efx/wp/wp03/xxx.efx  →  vfx/efx/wp/wp03/_028/xxx.efx
+#
+# 为什么不直接换成平级的 wpNN：
+#   - id=3  → `wp03` 等于原目录，等于没隔离
+#   - id=2  → `wp02` 会撞上双刀的武器组目录
+# 套在 wp03 下面就不会有任何命名冲突。
 # ----------------------------------------------------------------------
 def _isolate_key(epv_base, eid):
-    """`hm_wp03` + 28 → `_028`（固定 4 字符，可等长替换且不会撞车）。"""
+    """`hm_wp03` + 28 → `_028`（用作 wp03 下的子目录名）。"""
     m = re.match(r"^hm_(wp\d+)$", epv_base or "")
     if not m:
         return None
@@ -114,10 +117,8 @@ def _isolate_key(epv_base, eid):
     return "_%03d" % eid
 
 
-def _move_effect_dir(pkg, src_key, dst_key, log, note):
-    """把 vfx/efx/wp/<src_key>/ 整个搬到 <dst_key>/。"""
-    src_pre = "vfx/efx/wp/%s/" % src_key
-    dst_pre = "vfx/efx/wp/%s/" % dst_key
+def _move_effect_dir(pkg, src_pre, dst_pre, log, note):
+    """把 src_pre 下的所有文件搬到 dst_pre（都是完整路径前缀）。"""
     moved = 0
     for name in list(pkg.names()):
         if name.startswith(src_pre):
@@ -128,16 +129,13 @@ def _move_effect_dir(pkg, src_key, dst_key, log, note):
     return moved
 
 
-def _rewrite_effect_refs(pkg, src_key, dst_key, log):
-    r"""把包里所有 epv3 中的 `vfx\efx\wp\<src>\` 换成 `<dst>\`。
+def _rewrite_effect_refs(pkg, old_prefix, new_prefix, log):
+    r"""把包里所有 epv3 中的 old_prefix 换成 new_prefix。
 
-    等长替换，不改变二进制里任何偏移。
+    epv3 的路径是 \0 结尾的变长字符串，长度变化安全（后面数据顺移）。
     """
-    old = ("vfx\\efx\\wp\\%s\\" % src_key).encode("latin1")
-    new = ("vfx\\efx\\wp\\%s\\" % dst_key).encode("latin1")
-    if len(old) != len(new):
-        _log(log, "跳过改路径", "新旧长度不一致（%d vs %d）" % (len(old), len(new)))
-        return 0
+    old = old_prefix.replace("/", "\\").encode("latin1")
+    new = new_prefix.replace("/", "\\").encode("latin1")
     fixed = 0
     for name in list(pkg.names()):
         if not name.lower().endswith(".epv3"):
@@ -147,7 +145,7 @@ def _rewrite_effect_refs(pkg, src_key, dst_key, log):
             continue
         pkg.write(name, data.replace(old, new))
         fixed += 1
-        _log(log, "改特效路径", "%s：wp\\%s → %s" % (name, src_key, dst_key))
+        _log(log, "改特效路径", "%s：%s → %s" % (name, old_prefix, new_prefix))
     return fixed
 
 
@@ -189,8 +187,10 @@ def to_standalone(pkg, info, eid, owner_dir=None):
     iso = _isolate_key(base, eid)
     src_key = re.match(r"^hm_(wp\d+)$", base).group(1) if re.match(r"^hm_(wp\d+)$", base) else None
     if iso and src_key and iso != src_key:
-        if _move_effect_dir(pkg, src_key, iso, log, "隔离特效目录"):
-            _rewrite_effect_refs(pkg, src_key, iso, log)
+        src_pre = "vfx/efx/wp/%s/" % src_key
+        dst_pre = "vfx/efx/wp/%s/%s/" % (src_key, iso)
+        if _move_effect_dir(pkg, src_pre, dst_pre, log, "隔离特效目录"):
+            _rewrite_effect_refs(pkg, src_pre, dst_pre, log)
 
     # ---- epv3 ----
     if info.epv_files:
@@ -265,8 +265,10 @@ def to_common(pkg, info):
     iso = _isolate_key(base, info.effect_id or 0)
     src_key = re.match(r"^hm_(wp\d+)$", base).group(1) if re.match(r"^hm_(wp\d+)$", base) else None
     if iso and src_key and iso != src_key:
-        if _move_effect_dir(pkg, iso, src_key, log, "还原特效目录"):
-            _rewrite_effect_refs(pkg, iso, src_key, log)
+        src_pre = "vfx/efx/wp/%s/%s/" % (src_key, iso)
+        dst_pre = "vfx/efx/wp/%s/" % src_key
+        if _move_effect_dir(pkg, src_pre, dst_pre, log, "还原特效目录"):
+            _rewrite_effect_refs(pkg, src_pre, dst_pre, log)
 
     # ---- epv3 ----
     if not info.epv_files:
