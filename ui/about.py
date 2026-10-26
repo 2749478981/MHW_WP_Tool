@@ -19,8 +19,9 @@ FONT_MONO = ("Consolas", 9)
 
 
 class AboutWindow(tk.Toplevel):
-    def __init__(self, master):
+    def __init__(self, master, on_check=None):
         super().__init__(master)
+        self._on_check = on_check
         self.title("关于 %s" % version.APP_TITLE)
         self.configure(bg=BG)
         self.resizable(False, False)
@@ -58,8 +59,9 @@ class AboutWindow(tk.Toplevel):
 
         wrap = tk.Frame(self, bg=CARD, highlightthickness=1, highlightbackground=LINE)
         wrap.pack(fill="both", expand=True, padx=14)
+        # width=1 是必须的：Text 默认 80 字符宽，会把窗口撑出去
         txt = tk.Text(wrap, font=FONT_MONO, bg=CARD, fg=TEXT, relief="flat",
-                      wrap="word", padx=10, pady=8, height=10)
+                      wrap="char", padx=10, pady=8, width=1, height=12)
         vs = ttk.Scrollbar(wrap, orient="vertical", command=txt.yview)
         txt.configure(yscrollcommand=vs.set)
         vs.pack(side="right", fill="y")
@@ -81,6 +83,16 @@ class AboutWindow(tk.Toplevel):
                    command=self.destroy).pack(side="right")
         ttk.Button(btns, text="打开 B 站", width=10,
                    command=lambda: webbrowser.open(version.BILI_URL)).pack(side="right", padx=(0, 8))
+        if self._on_check:
+            ttk.Button(btns, text="检查更新", width=10,
+                       command=self._do_check).pack(side="left")
 
         self.bind("<Escape>", lambda _e: self.destroy())
         self.after(80, lambda: self.lift())
+
+    def _do_check(self):
+        """关掉关于窗口，交给主窗口去查（进度和结果都显示在主窗口）。"""
+        cb = self._on_check
+        self.destroy()
+        if cb:
+            cb()

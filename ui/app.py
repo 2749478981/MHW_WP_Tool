@@ -290,8 +290,6 @@ class App(tk.Tk):
         self.btn_preview.pack(side="right", padx=(0, 8))
         ttk.Button(btns, text="关于", width=6,
                    command=self._show_about).pack(side="right", padx=(0, 8))
-        ttk.Button(btns, text="检查更新", width=9,
-                   command=self._check_update).pack(side="right", padx=(0, 8))
         self.lbl_status = tk.Label(btns, text="", font=FONT_S, bg=BG, fg=MUTED)
         self.lbl_status.pack(side="left")
 
@@ -445,7 +443,7 @@ class App(tk.Tk):
 
     def _show_about(self):
         self._hide_tip()
-        AboutWindow(self)
+        AboutWindow(self, on_check=self._check_update)
 
     def _open_bili(self):
         self._hide_tip()
