@@ -12,3 +12,5 @@ __pycache__/
 _tmp_*.py
 selftest.log
 *.bak
+icon/preview.html
+icon/colors.html
