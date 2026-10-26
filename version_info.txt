@@ -1,7 +1,7 @@
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 5, 2, 0),
-    prodvers=(1, 5, 2, 0),
+    filevers=(1, 5, 0, 0),
+    prodvers=(1, 5, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -15,12 +15,12 @@ VSVersionInfo(
         '080404b0',
         [StringStruct('CompanyName', '真夜中のloop'),
          StringStruct('FileDescription', 'MHW 武器 MOD 工具'),
-         StringStruct('FileVersion', '1.5.2.0'),
+         StringStruct('FileVersion', '1.5.0.0'),
          StringStruct('InternalName', 'MHW_WP_Tool'),
          StringStruct('LegalCopyright', 'by 真夜中のloop'),
          StringStruct('OriginalFilename', 'MHW_WP_Tool.exe'),
          StringStruct('ProductName', 'MHW 武器 MOD 工具'),
-         StringStruct('ProductVersion', '1.5.2.0'),
+         StringStruct('ProductVersion', '1.5.0.0'),
          StringStruct('Comments', 'https://space.bilibili.com/478832252')])
     ]),
     VarFileInfo([VarStruct('Translation', [0x0804, 1200])])
